@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WanderAI – AI-Powered Travel, Personalized to You</title>
+    <meta name="description" content="WanderAI uses Gemini AI to generate complete, personalized trip itineraries with budget prediction, weather, restaurants and day-wise plans in seconds.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;1,14..32,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- LANDING PAGE                               -->
+<!-- ══════════════════════════════════════════ -->
+<div id="landing-page" class="landing-page">
+
+    <!-- TOP NAV -->
+    <nav class="land-nav">
+        <div class="land-nav-inner">
+            <a class="land-logo" href="#">
+                <span class="logo-plane">✈</span>
+                <span>Wander<b>AI</b></span>
+            </a>
+            <div class="land-nav-links">
+                <a href="#" onclick="openApp()">Plan a Trip</a>
+                <a href="#features">Features</a>
+                <a href="#inspiration">Inspiration</a>
+            </div>
+            <div class="land-nav-right">
+                <button class="btn-nav-cta" onclick="openApp()">Start Planning →</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- HERO -->
+    <section class="land-hero">
+        <div class="hero-bg-images">
+            <div class="hero-img hi-1"></div>
+            <div class="hero-img hi-2"></div>
+            <div class="hero-img hi-3"></div>
+            <div class="hero-img hi-4"></div>
+        </div>
+        <div class="hero-overlay"></div>
+        <div class="land-hero-content">
+            <p class="hero-eyebrow">AI-Powered Travel Planning</p>
+            <h1 class="land-hero-title">Bring the world<br>to <em>you</em>.</h1>
+            <p class="land-hero-sub">Plan a complete personalized trip in under 30 seconds. Day-wise itinerary, budget prediction, weather, restaurants — all powered by Gemini AI.</p>
+            <div class="hero-actions">
+                <button class="btn-hero-primary" onclick="openApp()">
+                    <span>✨</span> Start Chatting
+                </button>
+                <button class="btn-hero-ghost" onclick="scrollTo({top: document.getElementById('features').offsetTop, behavior:'smooth'})">
+                    See How It Works ↓
+                </button>
+            </div>
+            <div class="hero-trust">
+                <span>As seen in</span>
+                <span class="trust-logo">TechCrunch</span>
+                <span class="trust-divider">·</span>
+                <span class="trust-logo">CNBC</span>
+                <span class="trust-divider">·</span>
+                <span class="trust-logo">NYTimes</span>
+            </div>
+        </div>
+        <!-- Hero mock chat UI -->
+        <div class="hero-mockup">
+            <div class="mockup-bar">
+                <div class="mockup-dots"><span></span><span></span><span></span></div>
+                <span style="font-size:12px;color:#888">WanderAI</span>
+            </div>
+            <div class="mockup-chat">
+                <div class="mock-msg mock-ai"><span class="mock-avatar">✈</span><div class="mock-bubble">Hi! Where would you like to explore? 🌍</div></div>
+                <div class="mock-msg mock-user"><div class="mock-bubble">Plan a 5-day Goa trip under ₹30,000</div></div>
+                <div class="mock-msg mock-ai"><span class="mock-avatar">✈</span>
+                    <div class="mock-bubble">
+                        <div style="font-weight:600;margin-bottom:8px">🌊 Goa Escape – 5 Days</div>
+                        <div class="mock-cards">
+                            <div class="mock-card">📅 Day 1<br><small>Arrival · North Beaches</small></div>
+                            <div class="mock-card">🏖️ Day 2<br><small>Calangute · Baga</small></div>
+                            <div class="mock-card">🌅 Day 3<br><small>South Goa · Palolem</small></div>
+                        </div>
+                        <div style="margin-top:10px;font-size:12px;color:#10b981">💰 Est. Total: ₹28,500</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FEATURE HIGHLIGHTS -->
+    <section class="land-features" id="features">
+        <div class="feat-header">
+            <p class="feat-eyebrow">Everything You Need</p>
+            <h2>Start chatting.<br>Start exploring.</h2>
+            <p class="feat-sub">Just tell WanderAI where you want to go. It handles the rest.</p>
+        </div>
+        <div class="feat-grid">
+            <div class="feat-card feat-large" onclick="openApp()">
+                <div class="feat-icon-bg fc-purple"></div>
+                <div class="feat-icon">🗓️</div>
+                <h3>Day-wise Itinerary</h3>
+                <p>Get a complete hour-by-hour schedule personalized to your travel style, budget, and interests.</p>
+                <span class="feat-cta">Try it Now →</span>
+            </div>
+            <div class="feat-card" onclick="openApp()">
+                <div class="feat-icon-bg fc-blue"></div>
+                <div class="feat-icon">💸</div>
+                <h3>Budget Prediction</h3>
+                <p>AI estimates every cost from flights to street food based on your budget level.</p>
+                <span class="feat-cta">Try it Now →</span>
+            </div>
+            <div class="feat-card" onclick="openApp()">
+                <div class="feat-icon-bg fc-teal"></div>
+                <div class="feat-icon">🌤️</div>
+                <h3>Weather Forecasts</h3>
+                <p>Know what to pack with seasonal weather info and AI-curated packing lists.</p>
+                <span class="feat-cta">Try it Now →</span>
+            </div>
+            <div class="feat-card" onclick="openApp()">
+                <div class="feat-icon-bg fc-orange"></div>
+                <div class="feat-icon">🍜</div>
+                <h3>Restaurant Picks</h3>
+                <p>Discover must-try local dishes and top-rated restaurants matching your cuisine preferences.</p>
+                <span class="feat-cta">Try it Now →</span>
+            </div>
+            <div class="feat-card feat-large-right" onclick="openApp()">
+                <div class="feat-icon-bg fc-rose"></div>
+                <div class="feat-icon">🏛️</div>
+                <h3>Curated Attractions</h3>
+                <p>Top tourist spots, hidden gems, and local experiences handpicked by AI for your destination.</p>
+                <span class="feat-cta">Try it Now →</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- INSPIRATION SECTION -->
+    <section class="land-inspiration" id="inspiration">
+        <div class="insp-header">
+            <p class="feat-eyebrow">Get Inspired</p>
+            <h2>Popular destinations.<br>Start your trip now.</h2>
+        </div>
+        <div class="insp-grid">
+            <div class="insp-card" onclick="startInspiredTrip('Goa, India', 'beach')">
+                <div class="insp-img" style="background:linear-gradient(160deg,#f97316,#ea580c,#1e40af)"></div>
+                <div class="insp-content">
+                    <div class="insp-name">🌊 Goa, India</div>
+                    <div class="insp-desc">Beaches · Nightlife · Culture</div>
+                    <div class="insp-meta">From ₹18,000 · 4-5 days</div>
+                </div>
+            </div>
+            <div class="insp-card" onclick="startInspiredTrip('Tokyo, Japan', 'cultural')">
+                <div class="insp-img" style="background:linear-gradient(160deg,#ec4899,#8b5cf6,#1d4ed8)"></div>
+                <div class="insp-content">
+                    <div class="insp-name">🗾 Tokyo, Japan</div>
+                    <div class="insp-desc">Temples · Street Food · Anime</div>
+                    <div class="insp-meta">From ₹85,000 · 6-7 days</div>
+                </div>
+            </div>
+            <div class="insp-card" onclick="startInspiredTrip('Paris, France', 'romantic')">
+                <div class="insp-img" style="background:linear-gradient(160deg,#6366f1,#8b5cf6,#ec4899)"></div>
+                <div class="insp-content">
+                    <div class="insp-name">🗼 Paris, France</div>
+                    <div class="insp-desc">Romance · Art · Cuisine</div>
+                    <div class="insp-meta">From ₹1,20,000 · 5-6 days</div>
+                </div>
+            </div>
+            <div class="insp-card" onclick="startInspiredTrip('Manali, Himachal Pradesh', 'adventure')">
+                <div class="insp-img" style="background:linear-gradient(160deg,#06b6d4,#0891b2,#1e3a5f)"></div>
+                <div class="insp-content">
+                    <div class="insp-name">🏔️ Manali, India</div>
+                    <div class="insp-desc">Mountains · Trekking · Snow</div>
+                    <div class="insp-meta">From ₹15,000 · 5-6 days</div>
+                </div>
+            </div>
+            <div class="insp-card" onclick="startInspiredTrip('Bali, Indonesia', 'relaxation')">
+                <div class="insp-img" style="background:linear-gradient(160deg,#10b981,#059669,#065f46)"></div>
+                <div class="insp-content">
+                    <div class="insp-name">🌴 Bali, Indonesia</div>
+                    <div class="insp-desc">Temples · Rice Terraces · Surf</div>
+                    <div class="insp-meta">From ₹55,000 · 6-7 days</div>
+                </div>
+            </div>
+            <div class="insp-card" onclick="startInspiredTrip('Dubai, UAE', 'luxury')">
+                <div class="insp-img" style="background:linear-gradient(160deg,#f59e0b,#d97706,#92400e)"></div>
+                <div class="insp-content">
+                    <div class="insp-name">🏙️ Dubai, UAE</div>
+                    <div class="insp-desc">Skyline · Desert · Shopping</div>
+                    <div class="insp-meta">From ₹70,000 · 4-5 days</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="land-footer">
+        <div class="land-footer-inner">
+            <div class="foot-brand">
+                <div class="foot-logo">✈ WanderAI</div>
+                <p>AI-powered travel, personalized to you.</p>
+                <button class="btn-foot-cta" onclick="openApp()">Plan Your Trip Free →</button>
+            </div>
+            <div class="foot-links">
+                <div class="foot-col">
+                    <h4>For Travellers</h4>
+                    <a href="#" onclick="openApp()">Plan Your Trip</a>
+                    <a href="#inspiration">Inspiration</a>
+                    <a href="#features">Features</a>
+                </div>
+                <div class="foot-col">
+                    <h4>Company</h4>
+                    <a href="#">About</a>
+                    <a href="#">Privacy Policy</a>
+                    <a href="#">Terms of Service</a>
+                </div>
+            </div>
+        </div>
+        <div class="foot-bottom">
+            <span>© 2025 WanderAI · Powered by Google Gemini 2.5 Flash</span>
+        </div>
+    </footer>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- MAIN APP (Chat + Results)                  -->
+<!-- ══════════════════════════════════════════ -->
+<div id="app-page" class="app-page hidden">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sb-header">
+            <a class="sb-logo" href="#" onclick="goHome()">
+                <span>✈</span> WanderAI
+            </a>
+            <button class="sb-new-chat" onclick="newChat()" title="New Trip">
+                <span>✏️</span>
+            </button>
+        </div>
+
+        <div class="sb-section-label">Your Trips</div>
+        <div class="sb-trips" id="sb-trips">
+            <!-- Dynamic -->
+        </div>
+
+        <div class="sb-bottom">
+            <button class="sb-home-btn" onclick="goHome()">← Back to Home</button>
+        </div>
+    </aside>
+
+    <!-- MAIN CHAT AREA -->
+    <main class="app-main">
+
+        <!-- TOP BAR -->
+        <div class="app-topbar">
+            <button class="sb-toggle" id="sb-toggle" onclick="toggleSidebar()">☰</button>
+            <div class="app-topbar-title" id="app-topbar-title">New Trip</div>
+            <div class="app-topbar-actions">
+                <button class="topbar-btn" id="btn-export" onclick="exportTrip()" style="display:none">📋 Export</button>
+                <button class="topbar-btn" id="btn-print" onclick="printTrip()" style="display:none">🖨️ Print</button>
+            </div>
+        </div>
+
+        <!-- CHAT MESSAGES -->
+        <div class="chat-window" id="chat-window">
+
+            <!-- Welcome screen (shown when no messages) -->
+            <div class="chat-welcome" id="chat-welcome">
+                <div class="welcome-plane">✈️</div>
+                <h2>Where would you like to explore?</h2>
+                <p>Ask me anything — I'll plan your perfect trip with itineraries, budget, weather, restaurants and more.</p>
+                <div class="welcome-suggestions">
+                    <button class="sugg-btn" onclick="useSuggestion(this)">Plan a 5-day Goa beach trip under ₹30,000</button>
+                    <button class="sugg-btn" onclick="useSuggestion(this)">Best places to visit in Europe in 10 days</button>
+                    <button class="sugg-btn" onclick="useSuggestion(this)">Weekend getaway from Bangalore with family</button>
+                    <button class="sugg-btn" onclick="useSuggestion(this)">Luxury Maldives trip for honeymoon ₹2L budget</button>
+                </div>
+            </div>
+
+            <!-- Messages rendered here -->
+            <div class="chat-messages" id="chat-messages"></div>
+        </div>
+
+        <!-- CHAT INPUT BAR -->
+        <div class="chat-input-bar">
+            <div class="chat-input-inner">
+                <textarea id="chat-input"
+                    class="chat-textarea"
+                    placeholder="Ask WanderAI to plan your trip..."
+                    rows="1"
+                    onkeydown="handleInputKey(event)"
+                    oninput="autoResize(this)"></textarea>
+                <button class="chat-send-btn" id="chat-send-btn" onclick="sendMessage()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                </button>
+            </div>
+            <p class="chat-disclaimer">WanderAI can make mistakes. Verify critical travel information independently.</p>
+        </div>
+    </main>
+
+    <!-- RESULTS PANEL (right side) -->
+    <aside class="results-panel" id="results-panel">
+        <div class="rp-header">
+            <div class="rp-title" id="rp-title">Trip Details</div>
+            <button class="rp-close" onclick="closeResultsPanel()">✕</button>
+        </div>
+        <div class="rp-tabs" id="rp-tabs">
+            <button class="rp-tab active" data-tab="itinerary" onclick="rpSwitchTab('itinerary',this)">🗓️ Plan</button>
+            <button class="rp-tab" data-tab="budget" onclick="rpSwitchTab('budget',this)">💰 Budget</button>
+            <button class="rp-tab" data-tab="weather" onclick="rpSwitchTab('weather',this)">⛅ Weather</button>
+            <button class="rp-tab" data-tab="food" onclick="rpSwitchTab('food',this)">🍽️ Food</button>
+            <button class="rp-tab" data-tab="tips" onclick="rpSwitchTab('tips',this)">💡 Tips</button>
+        </div>
+        <div class="rp-body" id="rp-body">
+            <div class="rp-empty">
+                <span>🗺️</span>
+                <p>Generate a trip to see your detailed plan here</p>
+            </div>
+        </div>
+    </aside>
+</div>
+
+<!-- Toast -->
+<div class="toast hidden" id="toast"><span id="toast-msg"></span></div>
+
+<script src="app.js"></script>
+</body>
+</html>
