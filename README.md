@@ -1,0 +1,12 @@
+WanderAI is your ultimate digital travel companion, a premium web application designed to make trip planning effortless and deeply personalized. Powered by Google’s ultra-fast Gemini 2.5 Flash API, it operates directly in your browser, blending the ease of a casual chat with the precision of a high-end luxury travel agency.
+
+Here is a brief look at the powerful core features that bring your dream vacations to life:
+
+* **Conversational Itineraries:** Say goodbye to rigid, overwhelming spreadsheets. WanderAI crafts dynamic, day-by-day schedules tailored to your unique travel style. Every day includes realistic timelines, detailed activity descriptions, and categorized tags to keep your adventure flowing seamlessly from morning to night.
+* **Visual Budget Predictor:** Keep your vacation finances in check without the usual stress. This smart tool provides comprehensive cost estimates, breaking down your budget into exact percentages using clean, animated progress bars. It even offers clever, personalized money-saving tips to maximize your funds.
+* **Advanced Weather Engine:** Get the real story on your destination's climate. Beyond simple temperature highs and lows, it factors in seasonal descriptions, wind intensity, and UV levels to describe what the weather actually feels like. It then instantly generates a smart, dynamic packing list so you are always perfectly prepared.
+* **Curated Food & Dining:** Dive into the local culinary scene with confidence. WanderAI curates a bespoke menu of authentic, must-try regional dishes and expertly pairs them with top-rated restaurant recommendations that perfectly match your desired price range.
+* **Essential Insider Tips:** Skip the common tourist traps and navigate your destination exactly like a local. Get crucial on-the-ground intelligence, from navigating public transit and handling local currency to scoring the safest scooter rentals and beating the peak-season crowds.
+* **Trip History Sidebar:** Are you planning multiple getaways at once? The intuitive sidebar automatically saves your active conversations, allowing you to effortlessly toggle between a planned tropical beach retreat and a bustling European city tour without losing a single detail.
+
+In short, WanderAI takes the fragmented, overwhelming process of travel research and transforms it into an intuitive, end-to-end experience. Whether you are outlining your budget, packing your bags, or deciding where to eat, WanderAI handles the heavy lifting so you can focus entirely on enjoying the journey.
