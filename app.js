@@ -871,7 +871,32 @@ function renderRPFood(data) {
 // proxy with its own caching instead of calling Nominatim from the
 // browser directly — fine for this app's expected usage today.
 const geocodeCache = {};
-let rpMapInstance = null;
+let rpMap = null;
+let rpMapClusterGroup = null;
+
+const MAP_CATEGORY_STYLE = {
+    Restaurant:    { emoji: '🍽️', color: '#f97316' },
+    Accommodation: { emoji: '🏨', color: '#8b5cf6' },
+    Attraction:    { emoji: '📍', color: '#10b981' },
+    Transport:     { emoji: '🚗', color: '#64748b' },
+    Destination:   { emoji: '🏁', color: '#3b82f6' },
+};
+const MAP_DAY_COLORS = ['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#06b6d4', '#ef4444', '#8b5cf6', '#84cc16'];
+const colorForDay = (dayNum) => MAP_DAY_COLORS[(dayNum - 1) % MAP_DAY_COLORS.length];
+
+// Teardrop-shaped divIcon, colored + emoji'd per category, so restaurants,
+// hotels, attractions and transport are visually distinct at a glance
+// instead of sharing the same default pin.
+function mapDivIcon(category) {
+    const style = MAP_CATEGORY_STYLE[category] || MAP_CATEGORY_STYLE.Attraction;
+    return L.divIcon({
+        className: 'wander-map-pin',
+        html: `<div style="background:${style.color};width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.4);border:2px solid #fff"><span style="transform:rotate(45deg);font-size:13px">${style.emoji}</span></div>`,
+        iconSize: [26, 26],
+        iconAnchor: [13, 26],
+        popupAnchor: [0, -26],
+    });
+}
 
 async function geocodePlace(query) {
     if (query in geocodeCache) return geocodeCache[query];
@@ -889,77 +914,152 @@ async function geocodePlace(query) {
     }
 }
 
-// Restaurants are already curated, named venues (geocode well); itinerary
-// activities are noisier text, so only the first couple per day are used
-// as likely-to-be-real-place "headline" activities. Capped overall to
-// keep the sequential, rate-limited geocoding pass under ~20 seconds.
+// Infers a marker category from a time block's tags/text — used for
+// marker styling and the category filter checkboxes.
+function categorizeTimeBlock(tb) {
+    const tags = (tb.tags || []).map(t => String(t).toLowerCase());
+    const text = (tb.activity || '').toLowerCase();
+    if (tags.includes('food')) return 'Restaurant';
+    if (tags.includes('check-in') || /hotel|resort|guesthouse|hostel|check.?in/.test(text)) return 'Accommodation';
+    if (tags.includes('transport')) return 'Transport';
+    return 'Attraction';
+}
+
+// Every restaurant and every itinerary activity gets geocoded — no cap.
+// Restaurants aren't tied to a specific day (day: null), so they always
+// show regardless of the day filter; itinerary activities carry their day
+// number for route-line grouping and the day filter checkboxes.
 function collectMapPlaces(data) {
     const places = [];
     const seen = new Set();
-    const add = (name, category) => {
+    const add = (name, category, day) => {
         const clean = (name || '').trim();
-        if (!clean || seen.has(clean.toLowerCase())) return;
-        seen.add(clean.toLowerCase());
-        places.push({ name: clean, category });
+        if (!clean) return;
+        const key = `${clean.toLowerCase()}|${day ?? ''}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        places.push({ name: clean, category, day: day ?? null });
     };
-    (data.food?.restaurants || []).forEach(r => add(r.name, 'Restaurant'));
+    (data.food?.restaurants || []).forEach(r => add(r.name, 'Restaurant', null));
     (data.itinerary || []).forEach(day => {
-        (day.timeBlocks || []).slice(0, 2).forEach(tb => add(tb.activity, 'Activity'));
+        (day.timeBlocks || []).forEach(tb => add(tb.activity, categorizeTimeBlock(tb), day.day));
     });
-    return places.slice(0, 15);
+    return places;
 }
 
-function renderRPMapLoading() {
-    return `<div id="rp-map-container" style="height:360px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--bg-tertiary,#1a1a1a);color:var(--text-muted);font-size:13px;text-align:center;padding:20px">📍 Locating recommended places on the map…<br><span style="font-size:11px;opacity:0.7">This can take a few seconds</span></div>`;
+function renderRPMapLoading(doneCount, totalCount) {
+    const progress = totalCount ? `<br><span style="font-size:11px;opacity:0.7">${doneCount} of ${totalCount} located…</span>` : '';
+    return `<div id="rp-map-container" style="height:360px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--bg-tertiary,#1a1a1a);color:var(--text-muted);font-size:13px;text-align:center;padding:20px">📍 Locating recommended places on the map…${progress}</div>`;
 }
 
 async function loadRPMap(data) {
     const places = collectMapPlaces(data);
     const destQuery = data.destination || data.tripTitle || '';
     const isStillOnMapTab = () => document.querySelector('.rp-tab.active')?.dataset.tab === 'map';
+    const body = document.getElementById('rp-body');
 
     const destGeo = destQuery ? await geocodePlace(destQuery) : null;
     if (!isStillOnMapTab()) return;
 
-    const results = [];
+    const found = [];
     for (const p of places) {
         if (!isStillOnMapTab()) return;
         const geo = await geocodePlace(`${p.name}, ${destQuery}`);
-        if (geo) results.push({ ...p, ...geo });
+        if (geo) found.push({ ...p, ...geo });
+        body.innerHTML = renderRPMapLoading(found.length, places.length);
         await new Promise(r => setTimeout(r, 1100)); // respect Nominatim's ~1 req/sec policy
     }
     if (!isStillOnMapTab()) return;
 
-    const body = document.getElementById('rp-body');
-    if (!destGeo && !results.length) {
+    if (!destGeo && !found.length) {
         body.innerHTML = `<div class="rp-empty"><span>🗺️</span><p>Couldn't locate any places on the map for this trip.</p></div>`;
         return;
     }
 
-    body.innerHTML = `<div id="rp-map-container" style="height:360px;border-radius:10px;overflow:hidden"></div>
-        <p style="font-size:11px;color:var(--text-muted);margin-top:8px">📍 ${results.length} of ${places.length} places located · Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors</p>`;
+    const daysPresent = [...new Set(found.filter(r => r.day != null).map(r => r.day))].sort((a, b) => a - b);
+    const categoriesPresent = [...new Set(found.map(r => r.category))];
 
-    if (rpMapInstance) { rpMapInstance.remove(); rpMapInstance = null; }
+    body.innerHTML = `
+        <div id="rp-map-filters" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+            ${daysPresent.map(d => `<label style="display:flex;align-items:center;gap:4px;background:var(--bg-tertiary,#222);padding:3px 9px;border-radius:12px;cursor:pointer;font-size:11px"><input type="checkbox" checked data-filter-day="${d}">Day ${d}</label>`).join('')}
+            ${categoriesPresent.map(c => `<label style="display:flex;align-items:center;gap:4px;background:var(--bg-tertiary,#222);padding:3px 9px;border-radius:12px;cursor:pointer;font-size:11px"><input type="checkbox" checked data-filter-cat="${escHtml(c)}">${MAP_CATEGORY_STYLE[c]?.emoji || ''} ${escHtml(c)}</label>`).join('')}
+        </div>
+        <div id="rp-map-container" style="height:360px;border-radius:10px;overflow:hidden"></div>
+        <p style="font-size:11px;color:var(--text-muted);margin-top:8px">📍 ${found.length} of ${places.length} places located · Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors</p>`;
+
+    if (rpMap) { rpMap.remove(); rpMap = null; rpMapClusterGroup = null; }
     const map = L.map('rp-map-container');
-    rpMapInstance = map;
+    rpMap = map;
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 18,
     }).addTo(map);
 
-    const points = [];
+    // Markers live inside a cluster group so dense areas (e.g. 10
+    // restaurants in one city center) collapse into a single badge until
+    // zoomed in, instead of overlapping illegibly.
+    const clusterGroup = L.markerClusterGroup();
+    rpMapClusterGroup = clusterGroup;
+    const markerLayers = [];   // { layer, day, category } — for filtering
+    const polylineLayers = []; // { layer, day }
+    const boundsPoints = [];
+
     if (destGeo) {
-        L.marker([destGeo.lat, destGeo.lon]).addTo(map).bindPopup(`<b>${escHtml(data.destination || 'Destination')}</b>`);
-        points.push([destGeo.lat, destGeo.lon]);
+        L.marker([destGeo.lat, destGeo.lon], { icon: mapDivIcon('Destination') })
+            .addTo(map)
+            .bindPopup(`<b>${escHtml(data.destination || 'Destination')}</b>`);
+        boundsPoints.push([destGeo.lat, destGeo.lon]);
     }
-    results.forEach(r => {
-        L.marker([r.lat, r.lon]).addTo(map).bindPopup(`<b>${escHtml(r.name)}</b><br>${escHtml(r.category)}`);
-        points.push([r.lat, r.lon]);
+
+    found.forEach(r => {
+        const marker = L.marker([r.lat, r.lon], { icon: mapDivIcon(r.category) })
+            .bindPopup(`<b>${escHtml(r.name)}</b><br>${escHtml(r.category)}${r.day != null ? ` · Day ${r.day}` : ''}`);
+        clusterGroup.addLayer(marker);
+        markerLayers.push({ layer: marker, day: r.day, category: r.category });
+        boundsPoints.push([r.lat, r.lon]);
+    });
+    map.addLayer(clusterGroup);
+
+    // Day-by-day route lines: connect each day's stops in the order they
+    // appear in the itinerary, color-coded per day, so the map shows an
+    // actual travel path rather than just scattered pins.
+    const byDay = {};
+    found.forEach(r => { if (r.day != null) (byDay[r.day] ||= []).push(r); });
+    Object.entries(byDay).forEach(([day, pts]) => {
+        if (pts.length < 2) return;
+        const polyline = L.polyline(pts.map(p => [p.lat, p.lon]), {
+            color: colorForDay(Number(day)), weight: 3, opacity: 0.7, dashArray: '6,5',
+        }).addTo(map);
+        polylineLayers.push({ layer: polyline, day: Number(day) });
     });
 
-    if (points.length > 1) map.fitBounds(points, { padding: [30, 30] });
-    else if (points.length === 1) map.setView(points[0], 12);
+    if (boundsPoints.length > 1) map.fitBounds(boundsPoints, { padding: [30, 30] });
+    else if (boundsPoints.length === 1) map.setView(boundsPoints[0], 12);
     else map.setView([20, 0], 2);
+
+    // Day/category filter checkboxes toggle marker + route visibility.
+    // Restaurants (day === null) always respect the category filter but
+    // ignore the day filter, since they aren't tied to one day.
+    function applyMapFilters() {
+        const activeDays = new Set([...document.querySelectorAll('[data-filter-day]:checked')].map(c => Number(c.dataset.filterDay)));
+        const activeCats = new Set([...document.querySelectorAll('[data-filter-cat]:checked')].map(c => c.dataset.filterCat));
+
+        markerLayers.forEach(({ layer, day, category }) => {
+            const show = (day == null || activeDays.has(day)) && activeCats.has(category);
+            const has = clusterGroup.hasLayer(layer);
+            if (show && !has) clusterGroup.addLayer(layer);
+            if (!show && has) clusterGroup.removeLayer(layer);
+        });
+        polylineLayers.forEach(({ layer, day }) => {
+            const show = activeDays.has(day);
+            const has = map.hasLayer(layer);
+            if (show && !has) layer.addTo(map);
+            if (!show && has) map.removeLayer(layer);
+        });
+    }
+
+    const filtersEl = document.getElementById('rp-map-filters');
+    if (filtersEl) filtersEl.addEventListener('change', applyMapFilters);
 }
 
 // ── Tips ──
