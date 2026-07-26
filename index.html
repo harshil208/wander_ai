@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;1,14..32,400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 </head>
 <body>
 
@@ -309,6 +310,7 @@
             <button class="rp-tab" data-tab="budget" onclick="rpSwitchTab('budget',this)">💰 Budget</button>
             <button class="rp-tab" data-tab="weather" onclick="rpSwitchTab('weather',this)">⛅ Weather</button>
             <button class="rp-tab" data-tab="food" onclick="rpSwitchTab('food',this)">🍽️ Food</button>
+            <button class="rp-tab" data-tab="map" onclick="rpSwitchTab('map',this)">🗺️ Map</button>
             <button class="rp-tab" data-tab="tips" onclick="rpSwitchTab('tips',this)">💡 Tips</button>
         </div>
         <div class="rp-body" id="rp-body">
@@ -323,6 +325,7 @@
 <!-- Toast -->
 <div class="toast hidden" id="toast"><span id="toast-msg"></span></div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script src="app.js"></script>
 </body>
 </html>

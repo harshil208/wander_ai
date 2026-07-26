@@ -4,19 +4,70 @@
    ============================================================ */
 
 // ══════════════════ STATE ══════════════════
+// No API key here — Gemini calls go through /api/gemini, a serverless
+// function that holds the key server-side (see api/gemini.js). A static
+// site has no way to call a paid third-party API directly without
+// exposing the key to every visitor, so this is the only correct place
+// for it to live.
 const State = {
-    apiKey: 'AQ.Ab8RN6JEzmGrfKxqleHxSrsl1kiB69XiftKDv75ottz0Pa5g7A',
     currentTrip: null,
     trips: [],
     activeTrip: null,
     isGenerating: false,
 };
 
+// ══════════════════ PERSISTENCE ══════════════════
+const STORAGE_KEY = 'wanderai_trips_v1';
+
+function saveState() {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            trips: State.trips,
+            activeTrip: State.activeTrip,
+        }));
+    } catch (e) {
+        console.warn('Could not save trips to localStorage:', e.message);
+    }
+}
+
+function loadState() {
+    let raw;
+    try {
+        raw = localStorage.getItem(STORAGE_KEY);
+    } catch (e) {
+        console.warn('Could not read trips from localStorage:', e.message);
+        return;
+    }
+    if (!raw) return;
+    try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed.trips)) {
+            State.trips = parsed.trips;
+            State.activeTrip = parsed.activeTrip || (parsed.trips[0] && parsed.trips[0].id) || null;
+            // Rebuild the msgId -> tripData lookup used by showDetailPanel,
+            // since tripDataMap itself isn't persisted (it's derived).
+            State.trips.forEach(trip => {
+                (trip.messages || []).forEach(m => {
+                    if (m.tripData) tripDataMap[String(m.id).replace('.', '_')] = m.tripData;
+                });
+            });
+        }
+    } catch (e) {
+        console.warn('Corrupt trip data in localStorage, ignoring:', e.message);
+    }
+}
+
 // ══════════════════ PAGE MANAGEMENT ══════════════════
 function openApp() {
     document.getElementById('landing-page').classList.add('hidden');
     document.getElementById('app-page').classList.remove('hidden');
-    if (State.trips.length === 0) newChat();
+    if (State.trips.length === 0) {
+        newChat();
+    } else {
+        if (!getActiveTrip()) State.activeTrip = State.trips[0].id;
+        renderSidebar();
+        refreshChatUI();
+    }
 }
 
 function goHome() {
@@ -42,12 +93,14 @@ function newChat() {
     renderSidebar();
     refreshChatUI();
     resetResultsPanel();
+    saveState();
 }
 
 function setActiveTrip(id) {
     State.activeTrip = id;
     refreshChatUI();
     renderSidebar();
+    saveState();
 }
 
 function getActiveTrip() {
@@ -82,6 +135,10 @@ function refreshChatUI() {
     }
 }
 
+let renamingTripId = null;
+let pendingDeleteId = null;
+let pendingDeleteTimer = null;
+
 function renderSidebar() {
     const container = document.getElementById('sb-trips');
     if (!container) return;
@@ -89,17 +146,79 @@ function renderSidebar() {
         container.innerHTML = '<div style="padding:10px 12px;font-size:12px;color:var(--text-muted)">No trips yet</div>';
         return;
     }
-    container.innerHTML = State.trips.map(t => `
-        <div class="sb-trip-item ${t.id === State.activeTrip ? 'active' : ''}" onclick="setActiveTrip('${t.id}')">
+    container.innerHTML = State.trips.map(t => {
+        const titleHtml = t.id === renamingTripId
+            ? `<input class="sb-trip-rename-input" data-trip-id="${escHtml(t.id)}" value="${escHtml(t.title)}"
+                 style="flex:1;min-width:0;background:transparent;border:1px solid currentColor;border-radius:4px;color:inherit;font:inherit;padding:2px 4px">`
+            : `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${escHtml(t.title)}</span>`;
+        const deleteBtnHtml = t.id === pendingDeleteId
+            ? `<button class="sb-trip-action" data-action="delete" data-trip-id="${escHtml(t.id)}" title="Click again to confirm"
+                 style="background:none;border:1px solid #ef4444;border-radius:4px;cursor:pointer;font-size:10px;color:#ef4444;padding:2px 5px;white-space:nowrap">Confirm?</button>`
+            : `<button class="sb-trip-action" data-action="delete" data-trip-id="${escHtml(t.id)}" title="Delete" style="background:none;border:none;cursor:pointer;font-size:12px;opacity:0.65;padding:2px">🗑️</button>`;
+        return `
+        <div class="sb-trip-item ${t.id === State.activeTrip ? 'active' : ''}" data-trip-id="${escHtml(t.id)}">
             <span class="sb-trip-icon">✈️</span>
-            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${escHtml(t.title)}</span>
-        </div>
-    `).join('');
+            ${titleHtml}
+            <div class="sb-trip-actions" style="display:flex;gap:2px;flex-shrink:0;align-items:center">
+                <button class="sb-trip-action" data-action="rename" data-trip-id="${escHtml(t.id)}" title="Rename" style="background:none;border:none;cursor:pointer;font-size:12px;opacity:0.65;padding:2px">✏️</button>
+                ${deleteBtnHtml}
+            </div>
+        </div>`;
+    }).join('');
+
+    if (renamingTripId) {
+        const input = container.querySelector('.sb-trip-rename-input');
+        if (input) { input.focus(); input.select(); }
+    }
 }
 
-// ══════════════════ API KEY ══════════════════
-// API key is pre-loaded in State — no user input needed
-function saveApiKey() {}
+function startRenameTrip(id) {
+    renamingTripId = id;
+    renderSidebar();
+}
+
+function commitRenameTrip(id, newTitle) {
+    const trip = State.trips.find(t => t.id === id);
+    renamingTripId = null;
+    if (trip) {
+        const trimmed = newTitle.trim();
+        if (trimmed) trip.title = trimmed;
+        if (trip.id === State.activeTrip) document.getElementById('app-topbar-title').textContent = trip.title;
+    }
+    renderSidebar();
+    saveState();
+}
+
+// Click-to-arm, click-again-to-confirm — avoids a native confirm() dialog,
+// which blocks the entire page (including any automated testing of it)
+// until manually dismissed, and is jarring UX in a single-page app.
+function deleteTrip(id) {
+    const trip = State.trips.find(t => t.id === id);
+    if (!trip) return;
+
+    if (pendingDeleteId !== id) {
+        pendingDeleteId = id;
+        renderSidebar();
+        clearTimeout(pendingDeleteTimer);
+        pendingDeleteTimer = setTimeout(() => { pendingDeleteId = null; renderSidebar(); }, 3000);
+        return;
+    }
+
+    clearTimeout(pendingDeleteTimer);
+    pendingDeleteId = null;
+    State.trips = State.trips.filter(t => t.id !== id);
+    if (State.activeTrip === id) {
+        if (State.trips.length) {
+            State.activeTrip = State.trips[0].id;
+            refreshChatUI();
+        } else {
+            newChat();
+            return;
+        }
+    }
+    renderSidebar();
+    saveState();
+}
 
 // ══════════════════ SEND MESSAGE ══════════════════
 async function sendMessage() {
@@ -122,6 +241,7 @@ async function sendMessage() {
     pushMsg(trip, 'user', text, null);
     renderMessages(trip.messages);
     scrollChatBottom();
+    saveState();
 
     // Update sidebar title
     if (trip.title === 'New Trip') {
@@ -136,7 +256,7 @@ async function sendMessage() {
     showTyping();
 
     try {
-        const rawText = await callGemini(text);
+        const rawText = await callGemini(text, trip.tripData);
         removeTyping();
 
         const parsed = tryParseTrip(rawText);
@@ -164,6 +284,7 @@ async function sendMessage() {
     } finally {
         State.isGenerating = false;
         document.getElementById('chat-send-btn').disabled = false;
+        saveState();
     }
 }
 
@@ -193,42 +314,65 @@ function startInspiredTrip(destination, style) {
 }
 
 // ══════════════════ GEMINI API ══════════════════
-async function callGemini(userMsg) {
+async function callGemini(userMsg, existingTripData) {
+    const isRefinement = !!existingTripData;
     const isTripQuery = /plan|trip|travel|visit|itinerary|vacation|holiday|tour|days in|days at|week in|weekend|destination|explore|go to/i.test(userMsg);
 
-    const prompt = isTripQuery
-        ? buildTripPrompt(userMsg)
-        : `You are WanderAI, a friendly AI travel assistant. Answer this travel question helpfully and concisely:\n\n${userMsg}`;
+    const prompt = isRefinement
+        ? buildRefinementPrompt(existingTripData, userMsg)
+        : isTripQuery
+            ? buildTripPrompt(userMsg)
+            : `You are WanderAI, a friendly AI travel assistant. Answer this travel question helpfully and concisely:\n\n${userMsg}`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${State.apiKey}`;
+    const fallback = () => isRefinement ? getMockRefinementResponse(existingTripData) : getMockTripResponse(userMsg);
 
     try {
-        const res = await fetch(url, {
+        const res = await fetch('/api/gemini', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { temperature: 0.7, maxOutputTokens: 8192 }
-            })
+            body: JSON.stringify({ prompt })
         });
 
         if (!res.ok) {
             const errData = await res.json().catch(() => ({}));
             console.warn('Gemini API failed:', errData);
-            return getMockTripResponse(userMsg);
+            return fallback();
         }
 
         const data = await res.json();
         const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!text) {
             console.warn('Gemini response missing text, using fallback');
-            return getMockTripResponse(userMsg);
+            return fallback();
         }
         return text;
     } catch (err) {
         console.warn('Gemini fetch failed:', err);
-        return getMockTripResponse(userMsg);
+        return fallback();
     }
+}
+
+// A refinement request follows up on an existing trip ("make day 3 more
+// relaxed", "swap in vegetarian restaurants") rather than starting a new
+// one — so it sends the current trip JSON back to Gemini and asks for a
+// complete updated version, instead of building a fresh-trip prompt.
+function buildRefinementPrompt(tripData, userMsg) {
+    const { isMockFallback, ...cleanTripData } = tripData;
+    return `You are WanderAI, an expert AI travel planner. You previously generated this trip plan as JSON:
+
+${JSON.stringify(cleanTripData, null, 2)}
+
+The user now wants this change: "${userMsg}"
+
+Apply the requested change to the plan above. Keep everything else the same unless the change logically affects it (e.g. changing the number of days should adjust the itinerary array length; changing the budget level should adjust cost estimates accordingly).
+
+Respond ONLY with the complete, updated JSON object in the exact same structure as above — no explanation text, no markdown code fences, no extra characters before or after the JSON.`;
+}
+
+// If Gemini is unavailable mid-refinement, return the trip unchanged
+// (flagged as a fallback) rather than a generic, unrelated mock trip.
+function getMockRefinementResponse(existingTripData) {
+    return JSON.stringify({ ...existingTripData, isMockFallback: true });
 }
 
 function buildTripPrompt(userMsg) {
@@ -349,6 +493,7 @@ function getMockTripResponse(userMsg) {
     });
 
     const mock = {
+        isMockFallback: true,
         tripTitle: title,
         destination,
         duration: `${days} Days`,
@@ -482,6 +627,7 @@ function buildTripCardHTML(data, msgId) {
     const safeId = String(msgId).replace('.', '_');
 
     return `<div class="trip-response">
+        ${data.isMockFallback ? `<div class="mock-fallback-banner" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;font-size:12px;margin-bottom:10px">⚠️ AI is temporarily unavailable — showing a sample itinerary, not one generated for your specific request. Please try again shortly.</div>` : ''}
         <div class="trip-overview-bar">
             <div style="flex:1">
                 <div class="to-title">${escHtml(data.tripTitle || data.destination)}</div>
@@ -501,7 +647,7 @@ function buildTripCardHTML(data, msgId) {
             </div>`).join('')}
             ${data.itinerary.length > 5 ? `<div class="day-chip" style="opacity:0.5;display:flex;align-items:center;justify-content:center">+${data.itinerary.length - 5} more</div>` : ''}
         </div>` : ''}
-        <button class="view-plan-btn" onclick="showDetailPanel('${safeId}')">
+        <button class="view-plan-btn" data-msg-id="${escHtml(safeId)}">
             📋 View Full Itinerary & Details
         </button>
     </div>`;
@@ -593,6 +739,7 @@ function rpSwitchTab(tabId, btn) {
         case 'budget':    body.innerHTML = renderRPBudget(data);    break;
         case 'weather':   body.innerHTML = renderRPWeather(data);   break;
         case 'food':      body.innerHTML = renderRPFood(data);      break;
+        case 'map':       body.innerHTML = renderRPMapLoading(); loadRPMap(data); break;
         case 'tips':      body.innerHTML = renderRPTips(data);      break;
         default:          body.innerHTML = renderRPItinerary(data); break;
     }
@@ -601,8 +748,11 @@ function rpSwitchTab(tabId, btn) {
 // ── Itinerary ──
 function renderRPItinerary(data) {
     const days = data.itinerary || [];
-    if (!days.length) return '<p style="color:var(--text-muted);font-size:13px;padding:10px">No itinerary data.</p>';
-    return days.map((day, i) => `
+    const banner = data.isMockFallback
+        ? `<div class="mock-fallback-banner" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;font-size:12px;margin:0 0 10px">⚠️ AI is temporarily unavailable — this is a sample itinerary, not one generated for your specific request.</div>`
+        : '';
+    if (!days.length) return banner + '<p style="color:var(--text-muted);font-size:13px;padding:10px">No itinerary data.</p>';
+    return banner + days.map((day, i) => `
         <div class="rp-day-card">
             <div class="rp-day-header" onclick="toggleRPDay(${i})">
                 <div class="rp-day-num">D${day.day}</div>
@@ -711,6 +861,107 @@ function renderRPFood(data) {
     </div>`).join('')}` : ''}`;
 }
 
+// ── Map ──
+// Free, no-API-key map: Leaflet + OpenStreetMap tiles for rendering, and
+// OSM's Nominatim for geocoding place names into coordinates. Nominatim's
+// usage policy caps casual/browser use at ~1 request/second and requires
+// attribution, both of which this respects (sequential lookups with a
+// delay, and a visible "Map data © OpenStreetMap" credit). For real
+// production traffic at scale, this should go through a small backend
+// proxy with its own caching instead of calling Nominatim from the
+// browser directly — fine for this app's expected usage today.
+const geocodeCache = {};
+let rpMapInstance = null;
+
+async function geocodePlace(query) {
+    if (query in geocodeCache) return geocodeCache[query];
+    try {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+        const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) { geocodeCache[query] = null; return null; }
+        const results = await res.json();
+        const hit = (results && results[0]) ? { lat: parseFloat(results[0].lat), lon: parseFloat(results[0].lon) } : null;
+        geocodeCache[query] = hit;
+        return hit;
+    } catch (e) {
+        geocodeCache[query] = null;
+        return null;
+    }
+}
+
+// Restaurants are already curated, named venues (geocode well); itinerary
+// activities are noisier text, so only the first couple per day are used
+// as likely-to-be-real-place "headline" activities. Capped overall to
+// keep the sequential, rate-limited geocoding pass under ~20 seconds.
+function collectMapPlaces(data) {
+    const places = [];
+    const seen = new Set();
+    const add = (name, category) => {
+        const clean = (name || '').trim();
+        if (!clean || seen.has(clean.toLowerCase())) return;
+        seen.add(clean.toLowerCase());
+        places.push({ name: clean, category });
+    };
+    (data.food?.restaurants || []).forEach(r => add(r.name, 'Restaurant'));
+    (data.itinerary || []).forEach(day => {
+        (day.timeBlocks || []).slice(0, 2).forEach(tb => add(tb.activity, 'Activity'));
+    });
+    return places.slice(0, 15);
+}
+
+function renderRPMapLoading() {
+    return `<div id="rp-map-container" style="height:360px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--bg-tertiary,#1a1a1a);color:var(--text-muted);font-size:13px;text-align:center;padding:20px">📍 Locating recommended places on the map…<br><span style="font-size:11px;opacity:0.7">This can take a few seconds</span></div>`;
+}
+
+async function loadRPMap(data) {
+    const places = collectMapPlaces(data);
+    const destQuery = data.destination || data.tripTitle || '';
+    const isStillOnMapTab = () => document.querySelector('.rp-tab.active')?.dataset.tab === 'map';
+
+    const destGeo = destQuery ? await geocodePlace(destQuery) : null;
+    if (!isStillOnMapTab()) return;
+
+    const results = [];
+    for (const p of places) {
+        if (!isStillOnMapTab()) return;
+        const geo = await geocodePlace(`${p.name}, ${destQuery}`);
+        if (geo) results.push({ ...p, ...geo });
+        await new Promise(r => setTimeout(r, 1100)); // respect Nominatim's ~1 req/sec policy
+    }
+    if (!isStillOnMapTab()) return;
+
+    const body = document.getElementById('rp-body');
+    if (!destGeo && !results.length) {
+        body.innerHTML = `<div class="rp-empty"><span>🗺️</span><p>Couldn't locate any places on the map for this trip.</p></div>`;
+        return;
+    }
+
+    body.innerHTML = `<div id="rp-map-container" style="height:360px;border-radius:10px;overflow:hidden"></div>
+        <p style="font-size:11px;color:var(--text-muted);margin-top:8px">📍 ${results.length} of ${places.length} places located · Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors</p>`;
+
+    if (rpMapInstance) { rpMapInstance.remove(); rpMapInstance = null; }
+    const map = L.map('rp-map-container');
+    rpMapInstance = map;
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 18,
+    }).addTo(map);
+
+    const points = [];
+    if (destGeo) {
+        L.marker([destGeo.lat, destGeo.lon]).addTo(map).bindPopup(`<b>${escHtml(data.destination || 'Destination')}</b>`);
+        points.push([destGeo.lat, destGeo.lon]);
+    }
+    results.forEach(r => {
+        L.marker([r.lat, r.lon]).addTo(map).bindPopup(`<b>${escHtml(r.name)}</b><br>${escHtml(r.category)}`);
+        points.push([r.lat, r.lon]);
+    });
+
+    if (points.length > 1) map.fitBounds(points, { padding: [30, 30] });
+    else if (points.length === 1) map.setView(points[0], 12);
+    else map.setView([20, 0], 2);
+}
+
 // ── Tips ──
 function renderRPTips(data) {
     const tips = data.tips || [];
@@ -773,9 +1024,56 @@ function showToast(msg, dur = 3500) {
     toastTimer = setTimeout(() => el.classList.add('hidden'), dur);
 }
 
+// ══════════════════ DELEGATED EVENT LISTENERS ══════════════════
+// Sidebar trip items and "view plan" buttons are re-created on every
+// render via innerHTML, so their click handling is attached once to the
+// stable parent container (which is never itself replaced) rather than
+// as inline onclick="fn('${value}')" attributes. That avoids embedding
+// dynamic values as JS source text inside an HTML attribute — safe today
+// since these IDs are always timestamp/random-number based, but a
+// fragile pattern to build on if a future ID ever contains a quote.
+function initDelegatedListeners() {
+    const sbTrips = document.getElementById('sb-trips');
+    if (sbTrips) {
+        sbTrips.addEventListener('click', (e) => {
+            const actionBtn = e.target.closest('[data-action]');
+            if (actionBtn) {
+                const id = actionBtn.dataset.tripId;
+                if (actionBtn.dataset.action === 'delete') deleteTrip(id);
+                else if (actionBtn.dataset.action === 'rename') startRenameTrip(id);
+                return;
+            }
+            if (e.target.closest('.sb-trip-rename-input')) return;
+            const item = e.target.closest('.sb-trip-item');
+            if (item && item.dataset.tripId) setActiveTrip(item.dataset.tripId);
+        });
+
+        sbTrips.addEventListener('focusout', (e) => {
+            const input = e.target.closest('.sb-trip-rename-input');
+            if (input) commitRenameTrip(input.dataset.tripId, input.value);
+        });
+
+        sbTrips.addEventListener('keydown', (e) => {
+            const input = e.target.closest('.sb-trip-rename-input');
+            if (!input) return;
+            if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+            else if (e.key === 'Escape') { renamingTripId = null; renderSidebar(); }
+        });
+    }
+
+    const chatMessages = document.getElementById('chat-messages');
+    if (chatMessages) {
+        chatMessages.addEventListener('click', (e) => {
+            const btn = e.target.closest('.view-plan-btn');
+            if (btn && btn.dataset.msgId) showDetailPanel(btn.dataset.msgId);
+        });
+    }
+}
+
 // ══════════════════ INIT ══════════════════
 document.addEventListener('DOMContentLoaded', () => {
-    // API key is hardcoded — ready to use immediately, no setup needed
+    loadState();
+    initDelegatedListeners();
 });
 
 // Patch pushMsg after definition
